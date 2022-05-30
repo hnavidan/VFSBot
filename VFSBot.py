@@ -186,8 +186,8 @@ class VFSBot:
             last_date = records.readlines()[-1]
             
             if last_date != '0':
-                context.bot.send_message(chat_id="-1001501984585",
-                                         text="\U0001F1E7\U0001F1EA There are no appointments available right now.")
+                context.bot.send_message(chat_id=self.channel_id,
+                                         text="There are no appointments available right now.")
                 records.write('\n' + '0')
                 records.close
             return True
@@ -208,7 +208,7 @@ class VFSBot:
 
             if new_date != last_date and len(new_date) > 0:
                 context.bot.send_message(chat_id=self.channel_id,
-                                         text=f"\U0001F1E7\U0001F1EA Appointment available on {new_date}.")
+                                         text=f"Appointment available on {new_date}.")
                 records.write('\n' + new_date)
                 records.close()
             #update.message.reply_text("Checked!", disable_notification=True)
