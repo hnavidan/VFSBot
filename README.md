@@ -14,7 +14,7 @@ This python script automatically checks the available VFS appointments and notif
 2. Install the dependencies. 
 3. Download the latest Chromedriver from [here](https://chromedriver.chromium.org/).
 4. Move the chromedriver.exe file into the repo directory. 
-5. Create a Telegram bot using [BotFather](www.t.me/BotFather) and save the auth token.
+5. Create a Telegram bot using [BotFather](https://t.me/BotFather) and save the auth token.
 6. Make a Telegram channel to notify the appointment updates. 
 7. Use [this bot](https://t.me/username_to_id_bot) to find the channel id and your own account id.
 8. Update the config.ini file with your VFS URL, account info, telegram token, and ids.
