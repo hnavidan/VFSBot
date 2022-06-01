@@ -13,14 +13,15 @@ class Offline(Exception):
     pass
 
 class AdminHandler(Handler):
-    def __init__(self):
+    def __init__(self, admin_ids):
         super().__init__(self.cb)
+        self.admin_ids = admin_ids
 
     def cb(self, update: telegram.Update, context):
         update.message.reply_text('Unauthorized access!')
 
     def check_update(self, update: telegram.update.Update):
-        if update.message is None or update.message.from_user.id not in admin_ids:
+        if update.message is None or update.message.from_user.id not in self.admin_ids:
             return True
 
         return False
