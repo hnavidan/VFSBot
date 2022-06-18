@@ -35,6 +35,6 @@ Next, add the created bot in the channel you want to post updates to and make su
 
 ## TODO:
 1. Better captcha recognition.
-2. Check multiple countries at the same time.
+2. ~~Check multiple countries at the same time.~~
 3. Feature to update the config via Telegram input.
 4. Make the script more robust towards unexpected errors.
