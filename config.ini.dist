@@ -1,0 +1,12 @@
+[DEFAULT]
+interval = 120
+
+[VFS]
+url = https://row7.vfsglobal.com/Global-Appointment/Account/RegisteredLogin?q=shSA0YnE4pLF9Xzwon/x/NNL8oYEDVviiH9LFkvyoJmx/fXKYWsKwvlIATddMeXNypOzHaf4521VZR9ybH6NDxv/3lc4yA5fizsOnUdqVtA=
+email =
+password =
+
+[TELEGRAM]
+auth_token =
+channel_id = # format -1001234567890
+admin_ids = # format 1234567890
