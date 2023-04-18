@@ -243,8 +243,15 @@ class VFSBot:
                 return True
 
             self.message.broadcast("Selecting Visa Type 🤞🏽")
-
+            
             Select(self.browser.find_element(by=By.XPATH, value='//*[@id="VisaCategoryId"]')).select_by_value('684')
+
+            time.sleep(2)
+            subCategoryError = self.browser.find_element(by=By.XPATH, value='//*[@id="SubCategoryError"]').text
+
+            if subCategoryError != "" and "Aucun créneau disponible" in subCategoryError:
+                self.message.send("There are no appointments available for this type of visa 😔")
+                return True
             
             WebDriverWait(self.browser, 100).until(EC.presence_of_element_located((
                 By.XPATH, '//*[@id="dvEarliestDateLnk"]')))
@@ -260,7 +267,6 @@ class VFSBot:
                 self.message.broadcast(f"Appointment available on {new_date}.")
                 records.write('\n' + new_date)
                 records.close()
-            #update.message.reply_text("Checked!", disable_notification=True)
             return True
                 
 if __name__ == '__main__':
