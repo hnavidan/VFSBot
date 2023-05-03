@@ -3,10 +3,13 @@
 This python script automatically checks the available VFS appointments and notifies the earliest opening via Telegram.
 
 ## Dependencies
+Check 'requirements.txt' for Python packages.
+The captcha recognition is done using Tesseract OCR, which can be installed from [here](https://github.com/tesseract-ocr/tesseract).
+
 - Selenium
-- Selenium-stealth
+- Undetected-chromedriver
 - OpenCV
-- Tesseract
+- PyTesseract
 - Python-telegram-bot
 
 ## How to use
@@ -34,7 +37,5 @@ The created bot should have two default commands:
 Next, add the created bot in the channel you want to post updates to and make sure it has admin priviliges. In order to prevent repitition of messages, the script will keep a record of updates in the record.txt file. Furthermore, by specifying your account id as admin_id in the config.ini, you can prevent others from using the bot, which might cause unexpected behaivor. If you want multiple accounts to access the bot, you can enter multiple ids in the config file separated by space. 
 
 ## TODO:
-1. Better captcha recognition.
-2. Check multiple countries at the same time.
-3. Feature to update the config via Telegram input.
-4. Make the script more robust towards unexpected errors.
+1. Check multiple countries at the same time.
+2. Feature to update the config via Telegram input.

@@ -1,8 +1,7 @@
 import time
 import threading
+import undetected_chromedriver as uc
 from utils import *
-from selenium import webdriver
-from selenium_stealth import stealth
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -25,11 +24,6 @@ class VFSBot:
         admin_ids = list(map(int, config.get('TELEGRAM', 'admin_ids').split(" ")))
 
         updater = Updater(token, use_context=True)
-
-        self.options = webdriver.ChromeOptions()
-        self.options.add_argument("start-maximized")
-        self.options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        self.options.add_experimental_option('useAutomationExtension', False)
         
         dp = updater.dispatcher
 
@@ -49,11 +43,14 @@ class VFSBot:
            update.message.reply_text("You are now in queue.")
         
         WebDriverWait(self.browser, 600).until(EC.presence_of_element_located((By.NAME, 'EmailId')))
-        
+        time.sleep(1)
+
         self.browser.find_element(by=By.NAME, value='EmailId').send_keys(self.email_str)
         self.browser.find_element(by=By.NAME, value='Password').send_keys(self.pwd_str)
     
         
+        #update.message.reply_text("Sending Captcha...")
+
         captcha_img = self.browser.find_element(by=By.ID, value='CaptchaImage')
         
         self.captcha_filename = 'captcha.png'
@@ -72,13 +69,13 @@ class VFSBot:
                 try:
                     self.check_appointment(update, context)
                 except WebError:
-                    update.message.reply_text("An error has occured.\nTrying again.")
+                    update.message.reply_text("An WebError has occured.\nTrying again.")
                     raise WebError
                 except Offline:
-                    update.message.reply_text("Downloaded offline version. Trying again.")
+                    update.message.reply_text("Downloaded offline version. \nTrying again.")
                     continue
-                except:
-                    update.message.reply_text("An error has occured. \nTrying again.")
+                except Exception as e:
+                    update.message.reply_text("An error has occured: " + e + "\nTrying again.")
                     raise WebError
                 time.sleep(self.interval)
         elif "Your account has been locked, please login after 2 minutes." in self.browser.page_source:
@@ -89,54 +86,47 @@ class VFSBot:
            #update.message.reply_text("Incorrect captcha. \nTrying again.")
            return
         else:
-            update.message.reply_text("An error has occured. \nTrying again.")
+            update.message.reply_text("An unknown error has occured. \nTrying again.")
             #self.browser.find_element(by=By.XPATH, value='//*[@id="logoutForm"]/a').click()
             raise WebError
 
     
     def login_helper(self, update, context):
-        while True:
+        self.browser = uc.Chrome(options=self.options)    
+        while True and self.started:
             try:
                 self.login(update, context)
             except:
-                self.browser.quit()
-                self.open_browser()
                 continue
                 
-    def open_browser(self):
-        self.browser = webdriver.Chrome(options=self.options, 
-                 executable_path=r'chromedriver.exe')
-        
-        stealth(self.browser,
-                languages=["en-US", "en"],
-                vendor="Google Inc.",
-                platform="Win32",
-                webgl_vendor="Intel Inc.",
-                renderer="Intel Iris OpenGL Engine",
-                fix_hairline=True)
-    
     def help(self, update, context):
         update.message.reply_text("This is a VFS appointment bot!\nPress /start to begin.")
 
     def start(self, update, context):
-        try:
-            self.browser.close()
-        except:
-                pass
-        update.message.reply_text('Logging in...')
-        self.open_browser()
+        self.options = uc.ChromeOptions()
+        self.options.add_argument('--disable-gpu')
+        #Uncomment the following line to run headless
+        #self.options.add_argument('--headless=new')
+        
+        if hasattr(self, 'thr') and self.thr is not None:
+            update.message.reply_text("Bot is already running.")
+            return
         
         self.thr = threading.Thread(target=self.login_helper, args=(update, context))  
         self.thr.start()
+        self.started = True
 
     
     def quit(self, update, context):
         try:
             self.browser.quit()
-            self.thr.terminate()
+            self.thr = None
+            self.started = False
+            update.message.reply_text("Quit successfully.")
         except:
+            update.message.reply_text("Could not quit.")
             pass
-        update.message.reply_text("Quit successfully.")
+        
     
     def check_errors(self):
         if "Server Error in '/Global-Appointment' Application." in self.browser.page_source:
@@ -148,6 +138,8 @@ class VFSBot:
         elif "Session expired." in self.browser.page_source:
             return True
         elif "Sorry, looks like you were going too fast." in self.browser.page_source:
+            return True
+        elif "Sorry, Something has gone" in self.browser.page_source:
             return True
         
     def check_offline(self):
@@ -170,14 +162,14 @@ class VFSBot:
         self.browser.find_element(by=By.XPATH, value='//*[@id="LocationId"]').click()
         if self.check_errors():
              raise WebError
-        time.sleep(5)
+        time.sleep(3)
     
             
         self.browser.find_element(by=By.XPATH, value='//*[@id="LocationId"]/option[2]').click()
         if self.check_errors():
             raise WebError
     
-        time.sleep(5)
+        time.sleep(3)
 
             
         if "There are no open seats available for selected center - Belgium Long Term Visa Application Center-Tehran" in self.browser.page_source:
@@ -190,8 +182,6 @@ class VFSBot:
                                          text="There are no appointments available right now.")
                 records.write('\n' + '0')
                 records.close
-            return True
-        
         else:
             select = Select(self.browser.find_element(by=By.XPATH, value='//*[@id="VisaCategoryId"]'))
             select.select_by_value('1314')
@@ -211,9 +201,9 @@ class VFSBot:
                                          text=f"Appointment available on {new_date}.")
                 records.write('\n' + new_date)
                 records.close()
-            #update.message.reply_text("Checked!", disable_notification=True)
-            return True
+        #Uncomment if you want the bot to notify everytime it checks appointments.
+        #update.message.reply_text("Checked!", disable_notification=True)
+        return True
 
-                
 if __name__ == '__main__':
     VFSbot = VFSBot()
