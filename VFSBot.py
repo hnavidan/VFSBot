@@ -85,6 +85,10 @@ class VFSBot:
         elif "The verification words are incorrect." in self.browser.page_source:
            #update.message.reply_text("Incorrect captcha. \nTrying again.")
            return
+        elif "You are being rate limited" in self.browser.page_source:
+            update.message.reply_text("Rate Limited. \nPlease wait 5 minutes.")
+            time.sleep(300)
+            return
         else:
             update.message.reply_text("An unknown error has occured. \nTrying again.")
             #self.browser.find_element(by=By.XPATH, value='//*[@id="logoutForm"]/a').click()
@@ -118,13 +122,17 @@ class VFSBot:
 
     
     def quit(self, update, context):
+        if not self.started:
+            update.message.reply_text("Cannot quit. Bot is not running.")
+            return
+
         try:
             self.browser.quit()
             self.thr = None
             self.started = False
             update.message.reply_text("Quit successfully.")
         except:
-            update.message.reply_text("Could not quit.")
+            update.message.reply_text("Quit unsuccessful.")
             pass
         
     
