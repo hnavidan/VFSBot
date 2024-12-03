@@ -3,7 +3,8 @@ import re
 import pytesseract
 import telegram
 import numpy as np
-from telegram.ext import Handler
+from telegram import Update
+from telegram.ext import filters, CallbackContext
 
 pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
 
@@ -13,19 +14,15 @@ class WebError(Exception):
 class Offline(Exception):
     pass
 
-class AdminHandler(Handler):
+class AdminHandler:
     def __init__(self, admin_ids):
-        super().__init__(self.cb)
         self.admin_ids = admin_ids
 
-    def cb(self, update: telegram.Update, context):
-        update.message.reply_text('Unauthorized access!')
+    async def unauthorized_access(self, update: Update, context: CallbackContext):
+        await update.message.reply_text('Unauthorized access!')
 
-    def check_update(self, update: telegram.update.Update):
-        if update.message is None or update.message.from_user.id not in self.admin_ids:
-            return True
-
-        return False
+    def filter_admin(self):
+        return ~filters.User(user_id=self.admin_ids)
 
 def break_captcha():
     image = cv2.imread("captcha.png")
