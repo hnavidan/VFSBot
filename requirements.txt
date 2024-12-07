@@ -1,6 +1,6 @@
 selenium==4.9.0
 opencv-python==4.7.0.72
 pytesseract==0.3.10
-python-telegram-bot==13.11
+python-telegram-bot==21.7
 undetected-chromedriver==3.4.6
 numpy==1.24.0
