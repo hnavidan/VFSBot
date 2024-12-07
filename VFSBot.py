@@ -1,49 +1,52 @@
-import time
-import threading
+import asyncio
 import undetected_chromedriver as uc
 from utils import *
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from telegram.ext.updater import Updater
-from telegram.ext.commandhandler import CommandHandler
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler
 from configparser import ConfigParser
 
 class VFSBot:
     def __init__(self):
-        config = ConfigParser()
-        config.read('config.ini')
+        self.config = ConfigParser()
+        self.config.read('config.ini')
     
-        self.url = config.get('VFS', 'url')
-        self.email_str = config.get('VFS', 'email')
-        self.pwd_str = config.get('VFS', 'password')
-        self.interval = config.getint('DEFAULT', 'interval')
-        self.channel_id = config.get('TELEGRAM', 'channel_id')
-        token = config.get('TELEGRAM', 'auth_token')
-        admin_ids = list(map(int, config.get('TELEGRAM', 'admin_ids').split(" ")))
+        self.url = self.config.get('VFS', 'url')
+        self.email_str = self.config.get('VFS', 'email')
+        self.pwd_str = self.config.get('VFS', 'password')
+        self.interval = self.config.getint('VFS', 'interval')
+        self.channel_id = self.config.get('TELEGRAM', 'channel_id')
+        token = self.config.get('TELEGRAM', 'auth_token')
+        admin_ids = list(map(int, self.config.get('TELEGRAM', 'admin_ids').split(" ")))
+        self.started = False
+        self.admin_handler = AdminHandler(admin_ids)
 
-        updater = Updater(token, use_context=True)
+        self.app = ApplicationBuilder().token(token).build()
+
+        self.app.add_handler(MessageHandler(
+                self.admin_handler.filter_admin(),
+                self.admin_handler.unauthorized_access))
         
-        dp = updater.dispatcher
+        self.app.add_handler(CommandHandler("start", self.start))
+        self.app.add_handler(CommandHandler("help", self.help))
+        self.app.add_handler(CommandHandler("quit", self.quit))
+        self.app.add_handler(CommandHandler("setting", self.setting))
 
-        dp.add_handler(AdminHandler(admin_ids))
-        dp.add_handler(CommandHandler("start", self.start))
-        dp.add_handler(CommandHandler("help", self.help))
-        dp.add_handler(CommandHandler("quit", self.quit))
-
-
-        updater.start_polling()
-        updater.idle()
+        
+        self.app.run_polling()
     
-    def login(self, update, context):
+    async def login(self, update: Update, context: CallbackContext):
         self.browser.get((self.url))
         
+        # await asyncio.sleep(500) # For debugging purposes
         if "You are now in line." in self.browser.page_source:
            update.message.reply_text("You are now in queue.")
         
         WebDriverWait(self.browser, 600).until(EC.presence_of_element_located((By.NAME, 'EmailId')))
-        time.sleep(1)
+        await asyncio.sleep(1)
 
         self.browser.find_element(by=By.NAME, value='EmailId').send_keys(self.email_str)
         self.browser.find_element(by=By.NAME, value='Password').send_keys(self.pwd_str)
@@ -60,14 +63,14 @@ class VFSBot:
         captcha = break_captcha()
         
         self.browser.find_element(by=By.NAME, value='CaptchaInputText').send_keys(captcha)
-        time.sleep(1)
+        await asyncio.sleep(1)
         self.browser.find_element(by=By.ID, value='btnSubmit').click()
         
         if "Reschedule Appointment" in self.browser.page_source:
             update.message.reply_text("Successfully logged in!")
             while True:
                 try:
-                    self.check_appointment(update, context)
+                    await self.check_appointment(update, context)
                 except WebError:
                     update.message.reply_text("An WebError has occured.\nTrying again.")
                     raise WebError
@@ -77,17 +80,17 @@ class VFSBot:
                 except Exception as e:
                     update.message.reply_text("An error has occured: " + e + "\nTrying again.")
                     raise WebError
-                time.sleep(self.interval)
+                await asyncio.sleep(self.interval)
         elif "Your account has been locked, please login after 2 minutes." in self.browser.page_source:
            update.message.reply_text("Account locked.\nPlease wait 2 minutes.")
-           time.sleep(120)
+           await asyncio.sleep(120)
            return
         elif "The verification words are incorrect." in self.browser.page_source:
            #update.message.reply_text("Incorrect captcha. \nTrying again.")
            return
         elif "You are being rate limited" in self.browser.page_source:
             update.message.reply_text("Rate Limited. \nPlease wait 5 minutes.")
-            time.sleep(300)
+            await asyncio.sleep(300)
             return
         else:
             update.message.reply_text("An unknown error has occured. \nTrying again.")
@@ -95,47 +98,86 @@ class VFSBot:
             raise WebError
 
     
-    def login_helper(self, update, context):
-        self.browser = uc.Chrome(options=self.options)    
+    async def login_helper(self, update, context):
+        self.browser = uc.Chrome(options=self.options)
+
         while True and self.started:
             try:
-                self.login(update, context)
-            except:
+                await self.login(update, context)
+            except Exception as e:
+                print(e)
                 continue
                 
-    def help(self, update, context):
-        update.message.reply_text("This is a VFS appointment bot!\nPress /start to begin.")
+    async def help(self, update: Update, context: CallbackContext):
+        await update.message.reply_text("This is a VFS appointment bot!\nPress /start to begin.")
 
-    def start(self, update, context):
+    async def start(self, update: Update, context: CallbackContext):
         self.options = uc.ChromeOptions()
         self.options.add_argument('--disable-gpu')
         #Uncomment the following line to run headless
         #self.options.add_argument('--headless=new')
         
         if hasattr(self, 'thr') and self.thr is not None:
-            update.message.reply_text("Bot is already running.")
+            await update.message.reply_text("Bot is already running.")
             return
-        
-        self.thr = threading.Thread(target=self.login_helper, args=(update, context))  
-        self.thr.start()
+
         self.started = True
+        self.thr = asyncio.create_task(self.login_helper(update, context))
+        await update.message.reply_text("Bot started successfully.")
 
     
-    def quit(self, update, context):
+    async def quit(self, update: Update, context: CallbackContext):
         if not self.started:
-            update.message.reply_text("Cannot quit. Bot is not running.")
+            await update.message.reply_text("Cannot quit. Bot is not running.")
             return
 
         try:
             self.browser.quit()
             self.thr = None
             self.started = False
-            update.message.reply_text("Quit successfully.")
+            await update.message.reply_text("Quit successfully.")
         except:
-            update.message.reply_text("Quit unsuccessful.")
+            await update.message.reply_text("Quit unsuccessful.")
             pass
         
+    async def setting(self, update: Update, context: CallbackContext):
+        if not context.args or len(context.args) < 3:
+            await update.message.reply_text("Usage: /setting <section> <key> <value>\nExample: /setting VFS url https://example.com")
+            return
+       
+        section, key, value = context.args[0], context.args[1], ' '.join(context.args[2:])
+        
+        if not self.config.has_section(section):
+            await update.message.reply_text(f"Section '{section}' does not exist in the config file.")
+            return
+
+        if not self.config.has_option(section, key):
+            await update.message.reply_text(f"Key '{key}' does not exist in section '{section}'.")
+            return
+       
+           # Prevent changing the auth token
+        if section == 'TELEGRAM' and key == 'auth_token':
+            await update.message.reply_text("Cannot change the auth token.")
+            return
     
+        self.config.set(section, key, value)
+        with open('config.ini', 'w') as configfile:
+            self.config.write(configfile)
+
+        if section == 'VFS':
+            if key == 'url':
+                self.url = value
+            elif key == 'email':
+                self.email_str = value
+            elif key == 'password':
+                self.pwd_str = value
+        elif section == 'DEFAULT' and key == 'interval':
+            self.interval = int(value)
+        elif section == 'TELEGRAM' and key == 'channel_id':
+            self.channel_id = value
+        
+        await update.message.reply_text(f"Configuration updated: [{section}] {key} = {value}")
+
     def check_errors(self):
         if "Server Error in '/Global-Appointment' Application." in self.browser.page_source:
             return True
@@ -154,8 +196,8 @@ class VFSBot:
         if "offline" in self.browser.page_source:
             return True
             
-    def check_appointment(self, update, context):
-        time.sleep(5)
+    async def check_appointment(self, update, context):
+        await asyncio.sleep(5)
     
         self.browser.find_element(by=By.XPATH, 
                                 value='//*[@id="Accordion1"]/div/div[2]/div/ul/li[1]/a').click()
@@ -170,14 +212,14 @@ class VFSBot:
         self.browser.find_element(by=By.XPATH, value='//*[@id="LocationId"]').click()
         if self.check_errors():
              raise WebError
-        time.sleep(3)
+        await asyncio.sleep(3)
     
             
         self.browser.find_element(by=By.XPATH, value='//*[@id="LocationId"]/option[2]').click()
         if self.check_errors():
             raise WebError
     
-        time.sleep(3)
+        await asyncio.sleep(3)
 
             
         if "There are no open seats available for selected center - Belgium Long Term Visa Application Center-Tehran" in self.browser.page_source:
@@ -186,7 +228,7 @@ class VFSBot:
             last_date = records.readlines()[-1]
             
             if last_date != '0':
-                context.bot.send_message(chat_id=self.channel_id,
+                await context.bot.send_message(chat_id=self.channel_id,
                                          text="There are no appointments available right now.")
                 records.write('\n' + '0')
                 records.close
@@ -197,7 +239,7 @@ class VFSBot:
             WebDriverWait(self.browser, 100).until(EC.presence_of_element_located((
                 By.XPATH, '//*[@id="dvEarliestDateLnk"]')))
     
-            time.sleep(2)
+            await asyncio.sleep(2)
             new_date = self.browser.find_element(by=By.XPATH, 
                            value='//*[@id="lblDate"]').get_attribute('innerHTML')
             
@@ -205,7 +247,7 @@ class VFSBot:
             last_date = records.readlines()[-1]
 
             if new_date != last_date and len(new_date) > 0:
-                context.bot.send_message(chat_id=self.channel_id,
+                await context.bot.send_message(chat_id=self.channel_id,
                                          text=f"Appointment available on {new_date}.")
                 records.write('\n' + new_date)
                 records.close()

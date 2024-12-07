@@ -38,4 +38,3 @@ Next, add the created bot in the channel you want to post updates to and make su
 
 ## TODO:
 1. Check multiple countries at the same time.
-2. Feature to update the config via Telegram input.
